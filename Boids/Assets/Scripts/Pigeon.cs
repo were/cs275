@@ -4,38 +4,94 @@ using UnityEngine;
 
 public class Pigeon : MonoBehaviour
 {
-    public Transform boidPrefab;
-    public int swarmCount;
-    private int maxDistance = 45;
-    // Start is called before the first frame update
-    private Vector3 origin;
-    void Start()
-    {
+    Vector3 lShoulder, lElbow, lWrist, lHand;
+    Vector3 rShoulder, rElbow, rWrist, rHand;
+    Vector3 tail;
+
+    Vector3 []tailFan = new Vector3[12];
+
+    float tailSpread = 0;
+
+    void randomLeft() {
+        this.tail = transform.position + Neck2Shoulder * Random.onUnitSphere;
+        this.lShoulder = transform.position + Neck2Shoulder * Random.onUnitSphere;
+        Vector3 norm = Vector3.Normalize(Vector3.Cross(this.lShoulder, tail));
+        this.lElbow = this.lShoulder + Vector3.Normalize(Vector3.ProjectOnPlane(Random.onUnitSphere, norm));
+        this.lWrist = this.lElbow + Elbow2Wrist * Vector3.Normalize(Vector3.ProjectOnPlane(Random.onUnitSphere, norm));
+        this.lHand = this.lWrist + Wrist2Hand * Vector3.Normalize(Vector3.ProjectOnPlane(Random.onUnitSphere, norm));
+    }
+
+    void calcTailFan() {
+        Vector3 norm = Vector3.Normalize(Vector3.Cross(this.lShoulder, tail));
+        Vector3 x = Vector3.Normalize(Vector3.Cross(tail, norm));
+        Vector3 y = Vector3.Normalize(tail - transform.position);
+        float angle = (Mathf.PI / 3.0F) * (1F + Mathf.Cos(tailSpread) / 10.0F);
+        float delta = (Mathf.PI - angle * 2) / 12F;
+        for (int i = 0; i < 12; ++i) {
+            tailFan[i] = tail + (x * Mathf.Cos(angle) + y * Mathf.Sin(angle)) * TailLength;
+            angle += delta;
+        }
+        tailSpread += 0.005F;
+    }
+
+    void reflectRight() {
+        var norm = Vector3.Normalize(tail - transform.position - tail);
+        rShoulder = lShoulder - 2 * Vector3.ProjectOnPlane(lShoulder, norm);
+        rElbow = lElbow - 2 * Vector3.ProjectOnPlane(lElbow, norm);
+        rWrist = lWrist - 2 * Vector3.ProjectOnPlane(lWrist, norm);
+        rHand = lHand - 2 * Vector3.ProjectOnPlane(lHand, norm);
+    }
+
+    public void Start() {
         gameObject.AddComponent<MeshFilter>();
         gameObject.AddComponent<MeshRenderer>();
-        var mf = GetComponent<MeshFilter>().mesh;
-        mf.Clear();
-        mf.vertices = new Vector3[] {new Vector3(0,0,0), new Vector3(0,8,0), new Vector3(8, 8, 0)};
-        mf.uv = new Vector2[] {new Vector2(0, 0), new Vector2 (0, 0), new Vector2 (0, 0)};
-        mf.triangles = new int[] {0, 1, 2};
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        var mesh = GetComponent<MeshFilter>().mesh;
-        mesh.Clear();
-        mesh.vertices = new Vector3[] {new Vector3(0,0,0), new Vector3(0,8,0), new Vector3(8, 8, 0)};
-        mesh.uv = new Vector2[] {new Vector2(0, 0), new Vector2 (0, 0), new Vector2 (0, 0)};
-        mesh.triangles = new int[] {0, 1, 2};
         gameObject.AddComponent<LineRenderer>();
-        var lr = gameObject.GetComponent<LineRenderer>();
-        lr.startColor = Color.red;
-        lr.endColor = Color.blue;
-        lr.startWidth = 1.0f;
-        lr.endWidth = 2.0f;
-        lr.SetPosition(0, Random.insideUnitSphere * 15);
-        lr.SetPosition(1, Random.onUnitSphere * 15f);
+        randomLeft();
+        reflectRight();
+        calcTailFan();
     }
 
+    public void Update() {
+        //randomLeft();
+        reflectRight();
+        //calcTailFan();
+        var mesh = GetComponent<MeshFilter>().mesh;
+        var lr = gameObject.GetComponent<LineRenderer>();
+        mesh.Clear();
+        //lr.startWidth = 1.0f;
+        //lr.endWidth = 1.0f;
+        //lr.positionCount = 11;
+        //lr.SetPositions(new Vector3[]{lHand, lWrist, lElbow, lShoulder, transform.position, tail,
+        //                              transform.position, rShoulder, rElbow, rWrist, rHand});
+        List<Vector3> a = new List<Vector3>();
+        lr.positionCount = 6;
+        a.Add(transform.position);
+        a.Add(tail);
+        for (int i = 0; i < 12; ++i) {
+            a.Add(tailFan[i]);
+            a.Add(tail);
+        }
+        a.Add(transform.position);
+        a.Add(lShoulder);
+        a.Add(lElbow);
+        a.Add(lWrist);
+        a.Add(lHand);
+        a.Add(lWrist);
+        a.Add(lElbow);
+        a.Add(lShoulder);
+        a.Add(transform.position);
+        a.Add(rShoulder);
+        a.Add(rElbow);
+        a.Add(rWrist);
+        a.Add(rHand);
+
+        lr.positionCount = a.Count;
+        lr.SetPositions(a.ToArray());
+    }
+
+    static float Neck2Shoulder = 14;
+    static float Shoulder2Elbow = 2;
+    static float Elbow2Wrist = 5;
+    static float Wrist2Hand = 2;
+    static float TailLength = 10;
 }
