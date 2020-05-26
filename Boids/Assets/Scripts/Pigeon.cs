@@ -19,71 +19,94 @@ public class Pigeon : MonoBehaviour
     float tailSpread = 0;
 
     static Vector3 bodyRotation(Vector3 vec, Vector3 axis, float angle) {
-        return Quaternion.AngleAxis(angle, axis) * vec;
+        return Quaternion.AngleAxis(angle / Mathf.PI * 180, axis) * vec;
     }
 
-    void randomLeft() {
-        this.tail = transform.position - new Vector3(0, Neck2Shoulder, 0);
-        this.lShoulder = transform.position + Vector3.Normalize(new Vector3(-1, 1.7F, 0)) * Neck2Shoulder / 2.0F;
-        this.rShoulder = transform.position + Vector3.Normalize(new Vector3(1, 1.7F, 0)) * Neck2Shoulder / 2.0F;
+    static Vector3 calcElbow(float DOF, Vector3 neck, Vector3 shoulder, Vector3 tail, bool isLeft) {
+        var axisx = Vector3.Normalize(shoulder - neck);
+        var axisy = Vector3.Normalize(Vector3.Cross(shoulder, tail));
+        if (!isLeft) axisy = -axisy;
+        var axisz = Vector3.Normalize(Vector3.Cross(axisx, axisy));
 
-        this.lElbow = this.lShoulder + Vector3.Normalize(new Vector3(-1, -1, 0)) * Shoulder2Elbow;
-        this.lWrist = this.lElbow + Vector3.Normalize(new Vector3(-1.7F, 1, 0)) * Elbow2Wrist;
-        this.lHand = this.lWrist + Vector3.Normalize(new Vector3(-1, -1, 0)) * Wrist2Hand;
+        var rx = (Mathf.Cos(DOF + Mathf.PI * 1.33F) + 1.1F) / 1F;
+        var ry = (Mathf.Cos(DOF + Mathf.PI * 1.33F) + 0.8F) / 1F;
+        var rz = Mathf.Sin(DOF / 2) * Mathf.Sin(DOF / 4);
+
+        var coord = axisx;
+        coord = bodyRotation(coord, axisy, rx);
+        coord = bodyRotation(coord, axisz, rz);
+        coord = bodyRotation(coord, axisx, ry);
+        coord = Vector3.Normalize(coord) * Shoulder2Elbow;
+        return shoulder + coord;
+    }
+
+    static Vector3 calcWrist(float DOF, Vector3 shoulder, Vector3 tail, Vector3 elbow, bool isLeft) {
+       var axisx = Vector3.Normalize(elbow - shoulder);
+       var axisy = Vector3.Normalize(Vector3.Cross(shoulder, tail));
+       if (!isLeft) axisy = -axisy;
+
+       var rx = Mathf.Sin(DOF - Mathf.PI / 2) * Mathf.PI / 4F + Mathf.PI * 0.85F / 2;
+       var ry = Mathf.Cos(DOF) * Mathf.PI / 1.8F + Mathf.PI / 2F / 2;
+
+       var coord = axisx;
+       coord = bodyRotation(coord, axisy, ry);
+       coord = bodyRotation(coord, axisx, rx);
+       coord = Vector3.Normalize(coord) * Elbow2Wrist;
+
+
+       return elbow + coord;
+    }
+
+    static Vector3 Mirror(Vector3 a, Vector3 norm) {
+        return a - 2 * Vector3.ProjectOnPlane(a, norm);
+    }
+
+
+    void randomLeft() {
+        this.tail = transform.position - new Vector3(0, 0, Neck2Shoulder);
+
+        this.lShoulder = transform.position + Vector3.Normalize(new Vector3(-1, 0, 1.7F)) * Neck2Shoulder / 2.0F;
+        this.lElbow = this.lShoulder + Vector3.Normalize(new Vector3(-1, 0, -1)) * Shoulder2Elbow;
+        this.lWrist = this.lElbow + Vector3.Normalize(new Vector3(-1.7F, 0, 1)) * Elbow2Wrist;
+        this.lHand = this.lWrist + Vector3.Normalize(new Vector3(-1, 0, -1)) * Wrist2Hand;
+
+        this.rShoulder = transform.position + Vector3.Normalize(new Vector3(1, 0, 1.7F)) * Neck2Shoulder / 2.0F;
+        this.rElbow = this.rShoulder + Vector3.Normalize(new Vector3(1, 0, -1)) * Shoulder2Elbow;
+        this.rWrist = this.rElbow + Vector3.Normalize(new Vector3(1.7F, 0, 1)) * Elbow2Wrist;
+        this.rHand = this.rWrist + Vector3.Normalize(new Vector3(1, 0, -1)) * Wrist2Hand;
 
         DOF += 0.01F;
         if (DOF > 6.28) DOF = 0F;
 
-        // TODO(@were): I am not sure this rotation is good.
+        lElbow = calcElbow(DOF, transform.position, lShoulder, tail, false);
+        rElbow = calcElbow(DOF, transform.position, rShoulder, tail, true);
+
+        lWrist = calcWrist(DOF, lShoulder, tail, lElbow, false);
+        rWrist = calcWrist(DOF, rShoulder, tail, rElbow, true);
+
         {
-            var ry = (Mathf.Cos(DOF + Mathf.PI * 1.33F) + 0.8F) / 2F;
-            var rx = (Mathf.Cos(DOF + Mathf.PI * 1.33F) + 1.1F) / 2F;
-            var rz = (Mathf.Sin(DOF / 2) * Mathf.Sin(DOF / 4));
-            var rot = Quaternion.Euler(rx / Mathf.PI * 180, ry / Mathf.PI * 180, rz / Mathf.PI * 180);
-            var dir = rot * Vector3.Normalize(new Vector3(-1, -1, 0));
-            this.lElbow = this.lShoulder +  dir * Shoulder2Elbow;
+            var coord = Vector3.Normalize(lWrist - lElbow);
+            var rx = Mathf.Sin(DOF) * Mathf.PI / 8 + Mathf.PI / 8;
+            var axisy = Vector3.Normalize(Vector3.Cross(lWrist, lElbow));
+            coord = Vector3.Normalize(bodyRotation(coord, axisy, rx)) * Wrist2Hand;
+            this.lHand = lWrist + coord;
+            Debug.DrawRay(lWrist, (lHand - lWrist) * 4);
+            Debug.DrawRay(lWrist, (lWrist - lElbow) * 4, Color.red);
         }
         {
-            var rx = Mathf.Sin(DOF - Mathf.PI / 2) * Mathf.PI / 4F + Mathf.PI * 0.85F;
-            var ry = Mathf.Cos(DOF) * Mathf.PI / 1.8F + Mathf.PI / 2F;
-            rx = rx / Mathf.PI * 180 / 2;
-            ry = ry / Mathf.PI * 180 / 2;
-            var rot = Quaternion.Euler(rx, 0, ry);
-            var dir = rot * Vector3.Normalize(lElbow - lShoulder);
-            this.lWrist = lElbow + dir * Elbow2Wrist;
+            var coord = Vector3.Normalize(rWrist - rElbow);
+            var rx = Mathf.Sin(DOF) * Mathf.PI / 8 + Mathf.PI / 8;
+            var axisy = -Vector3.Normalize(Vector3.Cross(rWrist, rElbow));
+            coord = Vector3.Normalize(bodyRotation(coord, axisy, rx)) * Wrist2Hand;
+            this.rHand = rWrist + coord;
+            Debug.DrawRay(rWrist, (rHand - rWrist) * 4);
+            Debug.DrawRay(rWrist, (rWrist - rElbow) * 4, Color.red);
         }
-        {
-            var rx = Mathf.Sin(DOF - Mathf.PI / 2) * Mathf.PI / 4F;
-            rx = rx / Mathf.PI * 180;
-            var rot = Quaternion.Euler(0, rx, 0);
-            var dir = rot * Vector3.Normalize(lWrist - lElbow);
-            this.lHand = lWrist + dir * Wrist2Hand;
-        }
-        //this.lWrist = this.lElbow + Vector3.Normalize(lElbow - lShoulder) * Elbow2Wrist;
-        //this.lHand = this.lWrist + Vector3.Normalize(lWrist - lElbow) * Wrist2Hand;
 
-        this.rShoulder = transform.position + Vector3.Normalize(new Vector3(1, 1.7F, 0)) * Neck2Shoulder / 2.0F;
-        this.rElbow = this.rShoulder + Vector3.Normalize(new Vector3(1, -1, 0)) * Shoulder2Elbow;
-        this.rWrist = this.rElbow + Vector3.Normalize(new Vector3(1.7F, 1, 0)) * Elbow2Wrist;
-        this.rHand = this.rWrist + Vector3.Normalize(new Vector3(1, -1, 0)) * Wrist2Hand;
-
-        //this.tail = transform.position + Neck2Shoulder * Random.onUnitSphere;
-        //this.lShoulder = transform.position + Neck2Shoulder * Random.onUnitSphere;
-        //Vector3 norm = Vector3.Normalize(Vector3.Cross(this.lShoulder, tail));
-        //this.lElbow = this.lShoulder + Shoulder2Elbow * Vector3.Normalize(Vector3.ProjectOnPlane(Random.onUnitSphere, norm));
-        //this.lWrist = this.lElbow + Elbow2Wrist * Vector3.Normalize(Vector3.ProjectOnPlane(Random.onUnitSphere, norm));
-        //this.lHand = this.lWrist + Wrist2Hand * Vector3.Normalize(Vector3.ProjectOnPlane(Random.onUnitSphere, norm));
-    }
-
-    void calcMovement() {
-        {
-            var dir = lElbow - lShoulder;
-
-        }
     }
 
     void calcTailFan() {
-        Vector3 norm = Vector3.Normalize(Vector3.Cross(this.lShoulder, tail));
+        Vector3 norm = Vector3.Normalize(Vector3.Cross(this.lShoulder - transform.position, tail - transform.position));
         Vector3 x = Vector3.Normalize(Vector3.Cross(tail, norm));
         Vector3 y = Vector3.Normalize(tail - transform.position);
         float angle = (Mathf.PI / 3.0F) * (1F + Mathf.Cos(tailSpread) / 10.0F);
@@ -112,18 +135,18 @@ public class Pigeon : MonoBehaviour
         }
     }
 
-    private void buildPrimaryFeatherImpl(Vector3 hand, Vector3 wrist, Vector3 []primary) {
+    static void buildPrimaryFeatherImpl(Vector3 hand, Vector3 wrist, Vector3 []primary, bool shouldNeg) {
         var norm = Vector3.Cross(hand, wrist);
-        var dy = Vector3.Normalize(tail - transform.position);
-        dy = Vector3.Normalize(Vector3.Cross(norm, hand - wrist));
-        var dx = Vector3.Normalize(hand - wrist);
+        norm = Vector3.Cross(norm, hand);
+        var wing = Vector3.Normalize(hand - wrist);
         for (int i = 0; i < 10; ++i) {
-             primary[i] = wrist + (dx / 10F * i) + Vector3.Normalize(dy * Mathf.Sin(Mathf.PI / 20 * i) + dx * Mathf.Cos(Mathf.PI / 20 * i)) * (0.5F * i + 11F);
+             primary[i] = hand + (wrist - hand) * i * 0.1F + wing * (-0.5F * i + 16F);
+             wing = bodyRotation(wing, norm, Mathf.PI / 18 * (shouldNeg ? -1 : 1));
         }
     }
     public void buildFeather() {
-        buildPrimaryFeatherImpl(lHand, lWrist, lPrimaryFeather);
-        buildPrimaryFeatherImpl(rHand, rWrist, rPrimaryFeather);
+        buildPrimaryFeatherImpl(lHand, lWrist, lPrimaryFeather, false);
+        buildPrimaryFeatherImpl(rHand, rWrist, rPrimaryFeather, true);
         buildSecondaryFeatherImpl(lElbow, lWrist, lSecondaryFeather);
         buildSecondaryFeatherImpl(rElbow, rWrist, rSecondaryFeather);
         calcTailFan();
@@ -195,6 +218,7 @@ public class Pigeon : MonoBehaviour
         lr.positionCount = a.Count;
         lr.SetPositions(a.ToArray());
 
+        //transform.Translate(new Vector3(0, 0, 0.01F));
     }
 
     static float Neck2Shoulder = 14;
