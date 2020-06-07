@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class Pigeon : MonoBehaviour
 {
+    public Vector3 velocity;
     public Material material;
     Vector3 lShoulder, lElbow, lWrist, lHand;
     Vector3[][] lSecondaryFeather = new Vector3[8][];
@@ -71,7 +72,7 @@ public class Pigeon : MonoBehaviour
 
     void randomLeft() {
 
-        this.tail = transform.position - new Vector3(0, 0, Neck2Shoulder);
+        this.tail = transform.position - velocity.normalized * Neck2Shoulder;
 
         this.lShoulder = transform.position + Vector3.Normalize(new Vector3(-1, 0, 1.7F)) * Neck2Shoulder / 2.0F;
         this.lElbow = this.lShoulder + Vector3.Normalize(new Vector3(-1, 0, -1)) * Shoulder2Elbow;
@@ -82,6 +83,9 @@ public class Pigeon : MonoBehaviour
         this.rElbow = this.rShoulder + Vector3.Normalize(new Vector3(1, 0, -1)) * Shoulder2Elbow;
         this.rWrist = this.rElbow + Vector3.Normalize(new Vector3(1.7F, 0, 1)) * Elbow2Wrist;
         this.rHand = this.rWrist + Vector3.Normalize(new Vector3(1, 0, -1)) * Wrist2Hand;
+
+        this.lShoulder = transform.position + (Quaternion.AngleAxis(130F, transform.rotation.eulerAngles) * tail).normalized * Neck2Shoulder;
+        this.rShoulder = transform.position + (Quaternion.AngleAxis(130F, -transform.rotation.eulerAngles) * tail).normalized * Neck2Shoulder;
 
         DOF += 0.01F;
         if (DOF > 6.28) DOF = 0F;
@@ -225,9 +229,9 @@ public class Pigeon : MonoBehaviour
         lr.positionCount = a.Count;
         lr.SetPositions(a.ToArray());
 
-        var velocity = Vector3.Normalize(Vector3.Cross(Vector3.Cross(lShoulder, rShoulder), tail)) * 0.1F;
+        velocity = new Vector3(Mathf.Cos(DOF), Mathf.Cos(DOF) * Mathf.Sin(DOF), Mathf.Sin(DOF)) * 2F;
 
-        //transform.Translate(new Vector3(0, 0, 1));
+        transform.Translate(velocity);
 
         //transform.Translate(new Vector3(0, 0, 0.01F));
     }
